@@ -136,10 +136,6 @@ class CGDebugger:
 
         self.crashes = []
 
-    def disassemble(self, instructions):
-        for i in instructions:
-            print i
-
     def Run(self):
         if self.target:
             # Launch the process
