@@ -40,93 +40,70 @@ class CGCrash:
 class CGDebugger:
     def __init__(self, binary_path='./a.out', indata='out',
             sigstocatch=[signal.SIGSEGV, signal.SIGABRT]):
+        # We hook into lldb here
         self.debugger = lldb.SBDebugger.Create()
         self.debugger.SetAsync(False)
 
+        # Create the debugging target and identify which signals we want to
+        # catch
         self.target = self.debugger.CreateTarget(binary_path)
         self.sigstocatch = sigstocatch
 
+    def disassemble(self, instructions):
+        for i in instructions:
+            print i
+
     def Run(self):
-        return
+        if self.target:
+            # Launch the process
+            process = self.target.LaunchSimple(None, None, os.getcwd())
+            if process:
+                print process
+                state = process.GetState()
+                if state == lldb.eStateStopped:
+                    thread = process.GetThreadAtIndex(0)
+                    
+                    if thread:
+                        print thread
 
+                        # We only want to examine if we got a signal, not any
+                        # other condition.
+                        stop_reason = thread.GetStopReason()
+                        if stop_reason != lldb.eStopReasonSignal:
+                            process.Continue()
 
+                        sig = thread.GetStopReasonDataAtIndex(1)
+                        if sig not in self.sigstocatch:
+                            process.Continue()
 
-def disassemble(instructions):
-    for i in instructions:
-        print i
+                        frame = thread.GetFrameAtIndex(0)
+                        if frame:
+                            function = frame.GetFunction()
+                            if function:
+                                print function
+                                instructions = function.GetInstructions(self.target)
+                                self.disassemble(instructions)
+                            else:
+                                symbol = frame.GetSymbol()
+                                if symbol:
+                                    print symbol
+                                    instructions = symbol.GetInstructions(self.target)
+                                    self.disassemble(instructions)
 
-if __name__ == '__main__':
-    # Create the debugger
-    debugger = lldb.SBDebugger.Create()
-    debugger.SetAsync(False)
+                            register_list = frame.GetRegisters()
+                            print 'Frame registers (size of register set = {}):'.format(register_list.GetSize())
+                            for value in register_list:
+                                print "{} (number of children = {}):".format(value.GetName(), value.GetNumChildren())
+                                for child in value:
+                                    print 'Name: {} Value: {}'.format(child.GetName(), child.GetValue())
 
-    # FIXME: We currently set our target as a.out for testing purposes, this
-    # should however be absolutely arbitrary (parhaps a path to the input test
-    # cases and binary?
-    target = debugger.CreateTarget('./a.out')
-
-    if target:
-        # Launch the traget in the current working directory
-        process = target.LaunchSimple(None, None, os.getcwd())
-        if process:
-            state = process.GetState()
-            # XXX: Currently, we will only check for eStateStopped, as it is
-            # unclear to me what eStateCrashed means.
-            if state == lldb.eStateStopped:
-
-                # FIXME: Assumption that we are running on one thread (not
-                # always true!)
-                thread = process.GetThreadAtIndex(0)
-
-                if thread:
-                    print thread
-
-                    stop_reason = thread.GetStopReason()
-                    # If the stopping reason is not a signal, we just continue
-                    # execution
-                    if stop_reason != lldb.eStopReasonSignal:
-                        process.Continue()
-
-                    sig = thread.GetStopReasonDataAtIndex(1)
-                    # Check for SIGSEGV and SIGABRT
-                    # XXX: This should probably be written in a more generic
-                    # sense?
-                    if sig != signal.SIGSEGV or signal.SIGABRT:
-                        process.Continue()
-
-                    # Get the frame where we stopped
-                    # FIXME: We should walk all of the frames here and down to
-                    # the interested one. We are creating a graph, not just a
-                    # histogram
-                    frame = thread.GetFrameAtIndex(0)
-                    if frame:
-                        # Get the function that we crashed in
-                        function = frame.GetFunction()
-                        if function:
-                            print function
-                            instructions = function.GetInstructions(target)
-                            disassemble(instructions)
-                        else:
-                            # It wasn't a function, attempt the same thing with
-                            # a symbol
-                            symbol = frame.GetSymbol()
-                            if symbol:
-                                print symbol
-                                instructions = symbol.GetInstructions(target)
-                                disassemble(instructions)
-
-                        # Walk the register list
-                        registerList = frame.GetRegisters()
-                        print 'Frame registers (size of register set = {}):'.format(registerList.GetSize())
-                        for value in registerList:
-                            print "{} (number of children = {}):".format(value.GetName(), value.GetNumChildren())
-                            for child in value:
-                                print 'Name: {} Value: {}'.format(child.GetName(), child.GetValue())
-
-                    process.Continue()
-            # If we have successfully exited, there should be no crash graph.
+                process.Continue()
             elif state == lldb.eStateExited:
-                print "There have been no crashes in the executable"
+                print 'No crashes observed in the process'
             else:
                 print 'Unexpected process state: {}'.format(debugger.StateAsCString(state))
                 process.Kill()
+
+if __name__ == '__main__':
+    cgdb = CGDebugger()
+    cgdb.Run()
