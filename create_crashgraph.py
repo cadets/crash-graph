@@ -20,6 +20,30 @@ class CGRegister:
     def GetValue():
         return self.value
 
+class CGFunction:
+    def __init__(self, name="", args=None):
+        self.name = name
+        self.args = args
+
+    def SetName(self, name):
+        self.name = name
+
+    def SetArgs(self, args):
+        self.args = args
+
+    def AddArg(self, argname, argval):
+        self.args[argname] = argval
+
+    def GetArgValue(self, argname):
+        return self.args[argname]
+
+    def SetArgValue(self, argname, argval):
+        if self.args[argname]:
+            self.args[argname] = argval
+
+    def GetName(self):
+        return self.name
+
 class CGCrash:
     def __init__(self, backtrace=None, registers=None):
         self.backtrace = backtrace
@@ -37,6 +61,9 @@ class CGCrash:
     def GetBacktrace(self):
         return self.backtrace
 
+    def GetRegByName(self, name):
+        return self.registers[name]
+
 class CGDebugger:
     def __init__(self, binary_path='./a.out', indata='out',
             sigstocatch=[signal.SIGSEGV, signal.SIGABRT]):
@@ -48,6 +75,8 @@ class CGDebugger:
         # catch
         self.target = self.debugger.CreateTarget(binary_path)
         self.sigstocatch = sigstocatch
+
+        self.crashes = None
 
     def disassemble(self, instructions):
         for i in instructions:
@@ -76,33 +105,38 @@ class CGDebugger:
                         if sig not in self.sigstocatch:
                             process.Continue()
 
-                        frame = thread.GetFrameAtIndex(0)
-                        if frame:
-                            function = frame.GetFunction()
-                            if function:
-                                print function
-                                instructions = function.GetInstructions(self.target)
-                                self.disassemble(instructions)
-                            else:
-                                symbol = frame.GetSymbol()
-                                if symbol:
-                                    print symbol
-                                    instructions = symbol.GetInstructions(self.target)
+                        for frame in thread:
+                            if frame:
+                                function = frame.GetFunction()
+                                if function:
+                                    print function
+                                    instructions = function.GetInstructions(self.target)
                                     self.disassemble(instructions)
+                                else:
+                                    symbol = frame.GetSymbol()
+                                    if symbol:
+                                        print symbol
+                                        instructions = symbol.GetInstructions(self.target)
+                                        self.disassemble(instructions)
 
-                            register_list = frame.GetRegisters()
-                            print 'Frame registers (size of register set = {}):'.format(register_list.GetSize())
-                            for value in register_list:
-                                print "{} (number of children = {}):".format(value.GetName(), value.GetNumChildren())
-                                for child in value:
-                                    print 'Name: {} Value: {}'.format(child.GetName(), child.GetValue())
-
+                                register_list = frame.GetRegisters()
+                                new_crash.SetRegisters(register_list)
+                                print 'Frame registers (size of register set = {}):'.format(register_list.GetSize())
+                                for value in register_list:
+                                    print "{} (number of children = {}):".format(value.GetName(), value.GetNumChildren())
+                                    for child in value:
+                                        print 'Name: {} Value: {}'.format(child.GetName(), child.GetValue())
+                        process.Kill()
+                        return
+                elif state == lldb.eStateExited:
+                    print 'No crashes observed in the process'
+                else:
+                    print 'Unexpected process state: {}'.format(debugger.StateAsCString(state))
+                    process.Kill()
                 process.Continue()
-            elif state == lldb.eStateExited:
-                print 'No crashes observed in the process'
-            else:
-                print 'Unexpected process state: {}'.format(debugger.StateAsCString(state))
-                process.Kill()
+
+    def Dunp(self):
+        return
 
 if __name__ == '__main__':
     cgdb = CGDebugger()
