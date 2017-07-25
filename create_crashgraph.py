@@ -20,14 +20,36 @@ class CGRegister:
     def GetValue():
         return self.value
 
-class CGFunction:
-    def __init__(self, name=""):
-        self.name = name
+class CGCrash:
+    def __init__(self, backtrace=None, registers=None):
+        self.backtrace = backtrace
+        self.registers = registers
 
-class CGNode:
-    def __init__(self):
+    def SetRegisters(self, registers):
+        self.registers = registers
+
+    def SetBacktrace(self, backtrace):
+        self.backtrace = backtrace
+
+    def GetRegisters(self):
+        return self.registers
+
+    def GetBacktrace(self):
+        return self.backtrace
+
+class CGDebugger:
+    def __init__(self, binary_path='./a.out', indata='out',
+            sigstocatch=[signal.SIGSEGV, signal.SIGABRT]):
+        self.debugger = lldb.SBDebugger.Create()
+        self.debugger.SetAsync(False)
+
+        self.target = self.debugger.CreateTarget(binary_path)
+        self.sigstocatch = sigstocatch
+
+    def Run(self):
         return
-    
+
+
 
 def disassemble(instructions):
     for i in instructions:
@@ -48,7 +70,6 @@ if __name__ == '__main__':
         process = target.LaunchSimple(None, None, os.getcwd())
         if process:
             state = process.GetState()
-            print process
             # XXX: Currently, we will only check for eStateStopped, as it is
             # unclear to me what eStateCrashed means.
             if state == lldb.eStateStopped:
