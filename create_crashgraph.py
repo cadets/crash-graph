@@ -109,24 +109,18 @@ class CGCrash:
     We also record the registers for each frame inside of this class with the
     purpose of more detailed analysis later on.
     """
-    def __init__(self, backtrace=None, registers=None):
-        self.backtrace = backtrace
-        self.registers = registers
+    def __init__(self, frames=[], name="GenericCrashName"):
+        self.frames = frames
 
-    def SetRegisters(self, registers):
-        self.registers = registers
+    def AddFrame(self, cgframe):
+        self.frames.append(cgframe)
 
-    def SetBacktrace(self, backtrace):
-        self.backtrace = backtrace
+    def Backtrace(self):
+        for frame in self.frames:
+            print frame.GetFunction().GetName()
+            print frame.GetFunction().GetArgs()
 
-    def GetRegisters(self):
-        return self.registers
 
-    def GetBacktrace(self):
-        return self.backtrace
-
-    def GetRegByName(self, name):
-        return self.registers[name]
 
 class CGDebugger:
     def __init__(self, binary_path='./a.out', indata='out',
@@ -140,7 +134,7 @@ class CGDebugger:
         self.target = self.debugger.CreateTarget(binary_path)
         self.sigstocatch = sigstocatch
 
-        self.crashes = None
+        self.crashes = []
 
     def disassemble(self, instructions):
         for i in instructions:
@@ -150,6 +144,7 @@ class CGDebugger:
         if self.target:
             # Launch the process
             process = self.target.LaunchSimple(None, None, os.getcwd())
+            cgcrash = CGCrash()
             if process:
                 print process
                 state = process.GetState()
@@ -169,41 +164,33 @@ class CGDebugger:
                         if sig not in self.sigstocatch:
                             process.Continue()
 
+                        cgcrash = CGCrash()
+
                         for frame in thread:
                             if frame:
                                 cgframe = CGFrame()
                                 cgfunction = CGFunction()
-                                cgcrash = CGCrash()
                                 function = frame.GetFunction()
                                 if function:
                                     fargs = frame.GetVariables(True, False, False,
                                             False)
-                                    print function
                                     cgfunction.SetName(function.GetName())
-                                    #instructions = function.GetInstructions(self.target)
-                                    #self.disassemble(instructions)
 
                                     for arg in fargs:
                                         cgfunction.AddArg(arg.GetTypeName(),
                                                 arg.GetName(), arg.GetValue())
 
-                                    print cgfunction.GetArgs()
 
                                     register_list = frame.GetRegisters()
 
                                     cgframe.SetRegisters(register_list)
                                     cgframe.SetFunction(cgfunction)
-                                    #cgcrash.AddFrame(cgframe)
+                                    cgcrash.AddFrame(cgframe)
 
-                                    #print cgframe.GetRegisters()
-                                    print cgframe.GetFunction().GetName()
-                                    #print cgcrash
 
-                                    #print 'Frame registers (size of register set = {}):'.format(register_list.GetSize())
-                                    #for value in register_list:
-                                    #    print "{} (number of children = {}):".format(value.GetName(), value.GetNumChildren())
-                                    #    for child in value:
-                                    #        print 'Name: {} Value: {}'.format(child.GetName(), child.GetValue())
+
+                        self.crashes.append(cgcrash)
+
                         process.Kill()
                         return
                 elif state == lldb.eStateExited:
@@ -213,9 +200,11 @@ class CGDebugger:
                     process.Kill()
                 process.Continue()
 
-    def Dunp(self):
-        return
+    def Dump(self):
+        for crash in self.crashes:
+            crash.Backtrace()
 
 if __name__ == '__main__':
     cgdb = CGDebugger()
     cgdb.Run()
+    cgdb.Dump()
