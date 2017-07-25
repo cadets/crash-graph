@@ -5,6 +5,30 @@ import os
 import sys
 import signal
 
+class CGRegister:
+    def __init__(self, name="", num_children=0, value=0):
+        self.name = name
+        self.num_children = num_children
+        self.value = value
+
+    def GetName():
+        return self.name
+
+    def GetNumChildren():
+        return self.num_children
+
+    def GetValue():
+        return self.value
+
+class CGFunction:
+    def __init__(self, name=""):
+        self.name = name
+
+class CGNode:
+    def __init__(self):
+        return
+    
+
 def disassemble(instructions):
     for i in instructions:
         print i
@@ -22,17 +46,17 @@ if __name__ == '__main__':
             print process
             if state == lldb.eStateCrashed or state == lldb.eStateStopped:
                 thread = process.GetThreadAtIndex(0)
-                stop_reason = thread.GetStopReason()
-                if stop_reason != lldb.eStopReasonSignal:
-                    process.Continue()
-
-                sig = thread.GetStopReasonDataAtIndex(1)
-                if sig != signal.SIGSEGV:
-                    process.Continue()
 
                 if thread:
                     print thread
 
+                    stop_reason = thread.GetStopReason()
+                    if stop_reason != lldb.eStopReasonSignal:
+                        process.Continue()
+
+                    sig = thread.GetStopReasonDataAtIndex(1)
+                    if sig != signal.SIGSEGV or signal.SIGABRT:
+                        process.Continue()
                     frame = thread.GetFrameAtIndex(0)
                     if frame:
                         function = frame.GetFunction()
