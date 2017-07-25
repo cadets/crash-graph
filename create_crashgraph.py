@@ -4,6 +4,7 @@ import lldb
 import os
 import sys
 import signal
+from enum import Enum
 
 class CGRegister:
     def __init__(self, name="", num_children=0, value=0):
@@ -20,31 +21,94 @@ class CGRegister:
     def GetValue():
         return self.value
 
-class CGFunction:
-    def __init__(self, name="", args=None):
+class CGFrameEntryType(Enum):
+    FUNCTION = 1
+    SYMBOL   = 2
+
+class CGFrameEntry:
+    def __init__(self, name="", fetype=CGFrameEntryType.FUNCTION):
         self.name = name
-        self.args = args
+        self.type = fetype
 
     def SetName(self, name):
         self.name = name
 
-    def SetArgs(self, args):
-        self.args = args
-
-    def AddArg(self, argname, argval):
-        self.args[argname] = argval
-
-    def GetArgValue(self, argname):
-        return self.args[argname]
-
-    def SetArgValue(self, argname, argval):
-        if self.args[argname]:
-            self.args[argname] = argval
-
     def GetName(self):
         return self.name
 
+    def SetType(self, fetype):
+        self.type = fetype
+
+    def GetType(self):
+        return self.type
+
+class CGFunction(CGFrameEntry):
+    """
+    Currently, we only use CGFunction as a type of CGFrameEntry, CGSymbol is
+    unused.
+
+    We keep a dictionary of arguments in the function so that we can access
+    their values with their name in the scope of one frame.
+    """
+    def __init__(self, name="", args={}):
+        CGFrameEntry.__init__(self, name)
+        self.args = args
+
+    def SetArgs(self, args):
+        self.args = args
+
+    def AddArg(self, argtype, argname, argval):
+        self.args[argname] = (argtype, argval)
+
+    def GetArg(self, argname):
+        return self.args[argname]
+
+    def GetArgValue(self, argname):
+        return self.args[argname][0]
+
+    def GetArgType(self, argname):
+        return self.args[argname][1]
+
+    def SetArg(self, argtype, argname, argval):
+        if self.args[argname]:
+            self.args[argname] = (argtype, argval)
+
+    def GetArgs(self):
+        return self.args
+
+class CGSymbol(CGFrameEntry):
+    """
+    This is currently unused, but we might wish to abstract it away using this
+    method later on.
+    """
+    def __init__(self, name=""):
+        CGFrameEntry.__init__(self, name, CGFrameEntryType.SYMBOL)
+
+class CGFrame:
+    def __init__(self, cgfun=None, cgregs=None):
+        self.cgfun = cgfun
+        self.cgregs = cgregs
+
+    def SetRegisters(self, cgregs):
+        self.cgregs = cgregs
+
+    def GetRegisters(self):
+        return self.cgregs
+
+    def SetFunction(self, cgfun):
+        self.cgfun = cgfun
+
+    def GetFunction(self):
+        return self.cgfun
+
 class CGCrash:
+    """
+    We use CGCrash to keep the information of a full crash. It contains the
+    backtrace stack, which we pop off entry by entry until it's empty.
+
+    We also record the registers for each frame inside of this class with the
+    purpose of more detailed analysis later on.
+    """
     def __init__(self, backtrace=None, registers=None):
         self.backtrace = backtrace
         self.registers = registers
@@ -107,25 +171,39 @@ class CGDebugger:
 
                         for frame in thread:
                             if frame:
+                                cgframe = CGFrame()
+                                cgfunction = CGFunction()
+                                cgcrash = CGCrash()
                                 function = frame.GetFunction()
                                 if function:
+                                    fargs = frame.GetVariables(True, False, False,
+                                            False)
                                     print function
-                                    instructions = function.GetInstructions(self.target)
-                                    self.disassemble(instructions)
-                                else:
-                                    symbol = frame.GetSymbol()
-                                    if symbol:
-                                        print symbol
-                                        instructions = symbol.GetInstructions(self.target)
-                                        self.disassemble(instructions)
+                                    cgfunction.SetName(function.GetName())
+                                    #instructions = function.GetInstructions(self.target)
+                                    #self.disassemble(instructions)
 
-                                register_list = frame.GetRegisters()
-                                new_crash.SetRegisters(register_list)
-                                print 'Frame registers (size of register set = {}):'.format(register_list.GetSize())
-                                for value in register_list:
-                                    print "{} (number of children = {}):".format(value.GetName(), value.GetNumChildren())
-                                    for child in value:
-                                        print 'Name: {} Value: {}'.format(child.GetName(), child.GetValue())
+                                    for arg in fargs:
+                                        cgfunction.AddArg(arg.GetTypeName(),
+                                                arg.GetName(), arg.GetValue())
+
+                                    print cgfunction.GetArgs()
+
+                                    register_list = frame.GetRegisters()
+
+                                    cgframe.SetRegisters(register_list)
+                                    cgframe.SetFunction(cgfunction)
+                                    #cgcrash.AddFrame(cgframe)
+
+                                    #print cgframe.GetRegisters()
+                                    print cgframe.GetFunction().GetName()
+                                    #print cgcrash
+
+                                    #print 'Frame registers (size of register set = {}):'.format(register_list.GetSize())
+                                    #for value in register_list:
+                                    #    print "{} (number of children = {}):".format(value.GetName(), value.GetNumChildren())
+                                    #    for child in value:
+                                    #        print 'Name: {} Value: {}'.format(child.GetName(), child.GetValue())
                         process.Kill()
                         return
                 elif state == lldb.eStateExited:
