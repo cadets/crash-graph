@@ -182,8 +182,6 @@ class CGDebugger:
 
     def stdout_dump(self):
         for crash in self.crashes:
-            print crash.thread.GetProcess()
-            print crash.thread
             for frame in crash.get_backtrace():
                 cgfunc = frame.function
                 arg_str = ", ".join(["{} {} = {}".format(arg.atype,
@@ -195,6 +193,7 @@ class CGDebugger:
                                          cgfunc.name,
                                          arg_str,
                                          frame.line_entry)
+            print '\n'
 
     def json_dump(self):
         return
