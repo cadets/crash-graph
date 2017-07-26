@@ -12,6 +12,16 @@ import lldb
 import json
 from enum import Enum
 
+def jcrash(o):
+    if isinstance(o, CGCrash):
+        return [o.name, o.frames]
+    elif isinstance(o, CGFrame):
+        return [o.function, o.registers, str(o.line_entry)]
+    elif isinstance(o, CGFunction):
+        return [str(o.function_type), o.name, o.args]
+    elif isinstance(o, CGRegister):
+        return [str(o.type), str(o.name), str(o.value)]
+
 CGRegister = collections.namedtuple("CGRegister", ['type',
                                                    'name',
                                                    'value'])
@@ -70,7 +80,7 @@ class CGSymbol(CGFrameEntry):
 
 
 class CGFrame:
-    def __init__(self, function="", registers=None, line_entry=""):
+    def __init__(self, function=None, registers=None, line_entry=""):
         if registers is None:
             self.registers = []
 
@@ -186,15 +196,17 @@ class CGDebugger:
                                            arg.GetName(),
                                            arg.GetValue())
 
-                    cgframe = CGFrame(cgfunction,
+                    cgframe = CGFrame(function=cgfunction,
                                       line_entry=frame.GetLineEntry())
+
 
                     for val in frame.GetRegisters():
                         for reg in val:
-                            cgreg = CGRegister(val.GetName(),
-                                               reg.GetName(),
-                                               reg.GetValue())
-                            cgframe.AddRegister(cgreg)
+                            if reg.GetValue() is not None:
+                                cgreg = CGRegister(val.GetName(),
+                                                   reg.GetName(),
+                                                   reg.GetValue())
+                                cgframe.AddRegister(cgreg)
                     cgcrash.add_frame(cgframe)
                 self.crashes.append(cgcrash)
                 process.Kill()
@@ -218,10 +230,11 @@ class CGDebugger:
 
     def json_dump(self):
         for crash in self.crashes:
-            for frame in crash.frames:
-                for reg in frame.registers:
-                    if reg.value is not None:
-                        print json.dumps(reg)
+            print json.dumps(crash,
+                             sort_keys=True,
+                             indent=2,
+                             separators=(',', ': '),
+                             default=jcrash)
         return
 
 
