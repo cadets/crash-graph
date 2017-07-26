@@ -5,9 +5,9 @@
 
 import lldb
 import os
-import sys
 import signal
 from enum import Enum
+
 
 class CGRegister:
     def __init__(self, name="", num_children=0, value=0):
@@ -15,36 +15,39 @@ class CGRegister:
         self.num_children = num_children
         self.value = value
 
-    def GetName():
+    def get_name(self):
         return self.name
 
-    def GetNumChildren():
+    def get_num_children(self):
         return self.num_children
 
-    def GetValue():
+    def get_value(self):
         return self.value
+
 
 class CGFrameEntryType(Enum):
     FUNCTION = 1
-    SYMBOL   = 2
+    SYMBOL = 2
+
 
 class CGFrameEntry:
     def __init__(self, ftype="", name="", fetype=CGFrameEntryType.FUNCTION):
         self.name = name
-        self.type = fetype # Frame entry type
-        self.ftype = ftype # Function type
+        self.type = fetype  # Frame entry type
+        self.ftype = ftype  # Function type
 
-    def SetName(self, name):
+    def set_name(self, name):
         self.name = name
 
-    def GetName(self):
+    def get_name(self):
         return self.name
 
-    def SetType(self, fetype):
+    def set_type(self, fetype):
         self.type = fetype
 
-    def GetType(self):
+    def get_type(self):
         return self.type
+
 
 class CGFunction(CGFrameEntry):
     """
@@ -54,62 +57,67 @@ class CGFunction(CGFrameEntry):
     We keep a dictionary of arguments in the function so that we can access
     their values with their name in the scope of one frame.
     """
-    def __init__(self, ftype="", name="", args={}):
+    def __init__(self, ftype="", name="", args=None):
         CGFrameEntry.__init__(self, ftype, name)
+        if args is None:
+            args = {}
         self.args = args
 
-    def SetArgs(self, args):
+    def set_args(self, args):
         self.args = args
 
-    def AddArg(self, argtype, argname, argval):
+    def add_arg(self, argtype, argname, argval):
         self.args[argname] = (argtype, argval)
 
-    def GetArg(self, argname):
+    def get_arg(self, argname):
         return self.args[argname]
 
-    def GetArgValue(self, argname):
+    def get_arg_value(self, argname):
         return self.args[argname][0]
 
-    def GetArgType(self, argname):
+    def get_arg_type(self, argname):
         return self.args[argname][1]
 
-    def NumberOfArgs(self):
+    def number_of_args(self):
         return len(self.args)
 
-    def SetArg(self, argtype, argname, argval):
+    def set_arg(self, argtype, argname, argval):
         if self.args[argname]:
             self.args[argname] = (argtype, argval)
 
-    def GetArgs(self):
+    def get_args(self):
         return self.args
 
-    def GetType(self):
+    def get_type(self):
         return self.ftype
+
 
 class CGSymbol(CGFrameEntry):
     """
     This is currently unused, but we might wish to abstract it away using this
     method later on.
     """
-    def __init__(self, name=""):
-        CGFrameEntry.__init__(self, name, CGFrameEntryType.SYMBOL)
+    def __init__(self, ftype="", name=""):
+        CGFrameEntry.__init__(self, ftype, name, CGFrameEntryType.SYMBOL)
+
 
 class CGFrame:
     def __init__(self, cgfun=None, cgregs=None):
         self.cgfun = cgfun
         self.cgregs = cgregs
 
-    def SetRegisters(self, cgregs):
+    def set_registers(self, cgregs):
         self.cgregs = cgregs
 
-    def GetRegisters(self):
+    def get_registers(self):
         return self.cgregs
 
-    def SetFunction(self, cgfun):
+    def set_function(self, cgfun):
         self.cgfun = cgfun
 
-    def GetFunction(self):
+    def get_function(self):
         return self.cgfun
+
 
 class CGCrash:
     """
@@ -119,30 +127,36 @@ class CGCrash:
     We also record the registers for each frame inside of this class with the
     purpose of more detailed analysis later on.
     """
-    def __init__(self, frames=[], thread=None, name="GenericCrashName"):
+    def __init__(self, frames=None, thread=None, name="GenericCrashName"):
+        if frames is None:
+            frames = []
         self.frames = frames
         self.thread = thread
+        self.name = name
 
-    def AddFrame(self, cgframe):
+    def add_frame(self, cgframe):
         self.frames.append(cgframe)
 
-    def SetThread(self, thread):
+    def set_thread(self, thread):
         self.thread = thread
 
-    def GetThread(self):
+    def get_thread(self):
         return self.thread
 
-    def GetBacktrace(self):
+    def get_backtrace(self):
         return self.frames
 
 
-
 class CGDebugger:
-    def __init__(self, binary_path='./a.out', indata='out',
-            sigstocatch=[signal.SIGSEGV, signal.SIGABRT]):
+    def __init__(self,
+                 binary_path='./a.out',
+                 indata='out',
+                 sigstocatch=(signal.SIGSEGV, signal.SIGABRT)):
         # We hook into lldb here
         self.debugger = lldb.SBDebugger.Create()
         self.debugger.SetAsync(False)
+
+        self.indata = indata
 
         # Create the debugging target and identify which signals we want to
         # catch
@@ -151,7 +165,7 @@ class CGDebugger:
 
         self.crashes = []
 
-    def Run(self):
+    def run(self):
         if self.target:
             # Launch the process
             process = self.target.LaunchSimple(None, None, os.getcwd())
@@ -163,7 +177,7 @@ class CGDebugger:
                     thread = process.GetThreadAtIndex(0)
                     
                     if thread:
-                        cgcrash.SetThread(thread)
+                        cgcrash.set_thread(thread)
                         print thread
 
                         # We only want to examine if we got a signal, not any
@@ -182,25 +196,25 @@ class CGDebugger:
                             if frame:
                                 cgframe = CGFrame()
                                 cgfunction = CGFunction()
-                                function = frame.GetFunction()
-                                if function:
-                                    fargs = frame.GetVariables(True, False, False,
-                                            False)
-                                    cgfunction.SetType(function.GetType().GetName())
-                                    cgfunction.SetName(function.GetName())
+                                func = frame.GetFunction()
+                                if func:
+                                    fargs = frame.GetVariables(True,
+                                                               False,
+                                                               False,
+                                                               False)
+                                    cgfunction.set_type(func.GetType().GetName())
+                                    cgfunction.set_name(func.GetName())
 
                                     for arg in fargs:
-                                        cgfunction.AddArg(arg.GetTypeName(),
-                                                arg.GetName(), arg.GetValue())
+                                        cgfunction.add_arg(arg.get_type_name(),
+                                                           arg.get_name(),
+                                                           arg.get_value())
 
+                                    register_list = frame.get_registers()
 
-                                    register_list = frame.GetRegisters()
-
-                                    cgframe.SetRegisters(register_list)
-                                    cgframe.SetFunction(cgfunction)
-                                    cgcrash.AddFrame(cgframe)
-
-
+                                    cgframe.set_registers(register_list)
+                                    cgframe.set_function(cgfunction)
+                                    cgcrash.add_frame(cgframe)
 
                         self.crashes.append(cgcrash)
 
@@ -209,11 +223,11 @@ class CGDebugger:
                 elif state == lldb.eStateExited:
                     print 'No crashes observed in the process'
                 else:
-                    print 'Unexpected process state: {}'.format(debugger.StateAsCString(state))
+                    print 'Unexpected process state: {}'.format(self.debugger.StateAsCString(state))
                     process.Kill()
                 process.Continue()
 
-    def StdoutDump(self):
+    def stdout_dump(self):
         for crash in self.crashes:
             frames = crash.GetBacktrace()
             for frame in frames:
@@ -221,21 +235,15 @@ class CGDebugger:
                 ftype = cgfunc.GetType()
                 fname = cgfunc.GetName()
                 args = cgfunc.GetArgs()
-                print_str = "{} {}(".format(ftype, fname)
+                arg_str = ", ".join(["{} {} = {}".format(name, atype, val)
+                                     for name, (atype, val) in args.iteritems()])
+                print "{} {}({})".format(ftype, fname, arg_str)
 
-                for argname, (argtype, argvalue) in args.iteritems():
-                    print_str = print_str + "{} {} = {}, ".format(argtype,
-                            argname, argvalue)
-
-                print_str = print_str[0:-2]
-                print_str = print_str + ")"
-
-                print print_str
-
-    def JsonDump(self):
+    def json_dump(self):
         return
+
 
 if __name__ == '__main__':
     cgdb = CGDebugger()
-    cgdb.Run()
-    cgdb.StdoutDump()
+    cgdb.run()
+    cgdb.stdout_dump()
