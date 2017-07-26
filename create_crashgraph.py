@@ -29,9 +29,10 @@ class CGFrameEntryType(Enum):
     SYMBOL   = 2
 
 class CGFrameEntry:
-    def __init__(self, name="", fetype=CGFrameEntryType.FUNCTION):
+    def __init__(self, ftype="", name="", fetype=CGFrameEntryType.FUNCTION):
         self.name = name
-        self.type = fetype
+        self.type = fetype # Frame entry type
+        self.ftype = ftype # Function type
 
     def SetName(self, name):
         self.name = name
@@ -53,8 +54,8 @@ class CGFunction(CGFrameEntry):
     We keep a dictionary of arguments in the function so that we can access
     their values with their name in the scope of one frame.
     """
-    def __init__(self, name="", args={}):
-        CGFrameEntry.__init__(self, name)
+    def __init__(self, ftype="", name="", args={}):
+        CGFrameEntry.__init__(self, ftype, name)
         self.args = args
 
     def SetArgs(self, args):
@@ -72,12 +73,18 @@ class CGFunction(CGFrameEntry):
     def GetArgType(self, argname):
         return self.args[argname][1]
 
+    def NumberOfArgs(self):
+        return len(self.args)
+
     def SetArg(self, argtype, argname, argval):
         if self.args[argname]:
             self.args[argname] = (argtype, argval)
 
     def GetArgs(self):
         return self.args
+
+    def GetType(self):
+        return self.ftype
 
 class CGSymbol(CGFrameEntry):
     """
@@ -125,10 +132,8 @@ class CGCrash:
     def GetThread(self):
         return self.thread
 
-    def Backtrace(self):
-        for frame in self.frames:
-            print frame.GetFunction().GetName()
-            print frame.GetFunction().GetArgs()
+    def GetBacktrace(self):
+        return self.frames
 
 
 
@@ -181,6 +186,7 @@ class CGDebugger:
                                 if function:
                                     fargs = frame.GetVariables(True, False, False,
                                             False)
+                                    cgfunction.SetType(function.GetType().GetName())
                                     cgfunction.SetName(function.GetName())
 
                                     for arg in fargs:
@@ -207,11 +213,29 @@ class CGDebugger:
                     process.Kill()
                 process.Continue()
 
-    def Dump(self):
+    def StdoutDump(self):
         for crash in self.crashes:
-            crash.Backtrace()
+            frames = crash.GetBacktrace()
+            for frame in frames:
+                cgfunc = frame.GetFunction()
+                ftype = cgfunc.GetType()
+                fname = cgfunc.GetName()
+                args = cgfunc.GetArgs()
+                print_str = "{} {}(".format(ftype, fname)
+
+                for argname, (argtype, argvalue) in args.iteritems():
+                    print_str = print_str + "{} {} = {}, ".format(argtype,
+                            argname, argvalue)
+
+                print_str = print_str[0:-2]
+                print_str = print_str + ")"
+
+                print print_str
+
+    def JsonDump(self):
+        return
 
 if __name__ == '__main__':
     cgdb = CGDebugger()
     cgdb.Run()
-    cgdb.Dump()
+    cgdb.StdoutDump()
