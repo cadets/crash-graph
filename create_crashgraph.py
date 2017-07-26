@@ -1,5 +1,8 @@
 #!/usr/local/bin/python
 
+"""
+"""
+
 import lldb
 import os
 import sys
@@ -109,11 +112,18 @@ class CGCrash:
     We also record the registers for each frame inside of this class with the
     purpose of more detailed analysis later on.
     """
-    def __init__(self, frames=[], name="GenericCrashName"):
+    def __init__(self, frames=[], thread=None, name="GenericCrashName"):
         self.frames = frames
+        self.thread = thread
 
     def AddFrame(self, cgframe):
         self.frames.append(cgframe)
+
+    def SetThread(self, thread):
+        self.thread = thread
+
+    def GetThread(self):
+        return self.thread
 
     def Backtrace(self):
         for frame in self.frames:
@@ -148,6 +158,7 @@ class CGDebugger:
                     thread = process.GetThreadAtIndex(0)
                     
                     if thread:
+                        cgcrash.SetThread(thread)
                         print thread
 
                         # We only want to examine if we got a signal, not any
