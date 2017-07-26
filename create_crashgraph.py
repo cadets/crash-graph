@@ -11,7 +11,9 @@ import lldb
 from enum import Enum
 
 
-CGRegister = collections.namedtuple("CGRegister", ['name', 'num_children', 'value'])
+CGRegister = collections.namedtuple("CGRegister", ['name',
+                                                   'num_children',
+                                                   'value'])
 
 
 class CGFrameEntryType(Enum):
@@ -62,10 +64,13 @@ class CGSymbol(CGFrameEntry):
     method later on.
     """
     def __init__(self, function_type="", name=""):
-        CGFrameEntry.__init__(self, function_type, name, CGFrameEntryType.SYMBOL)
+        CGFrameEntry.__init__(self, function_type, name,
+                              CGFrameEntryType.SYMBOL)
 
 
-CGFrame = collections.namedtuple("CGFrame", ['function', 'registers', 'line_entry'])
+CGFrame = collections.namedtuple("CGFrame", ['function',
+                                             'registers',
+                                             'line_entry'])
 
 
 class CGCrash:
@@ -116,7 +121,7 @@ class CGDebugger:
     def run(self):
         if not self.target:
             return
-        
+
         # Iterate over the test cases
         for tc in self.test_cases:
             error = lldb.SBError()
@@ -138,7 +143,8 @@ class CGDebugger:
             if state == lldb.eStateExited:
                 print 'No crashes observed in the process'
             elif state != lldb.eStateStopped:
-                print 'Unexpected process state: {}'.format(self.debugger.StateAsCString(state))
+                print 'Unexpected process state: {}'.format(
+                    self.debugger.StateAsCString(state))
                 process.Kill()
             else:
                 thread = process.GetThreadAtIndex(0)
@@ -190,9 +196,9 @@ class CGDebugger:
                                      for name, arg
                                      in cgfunc.args.iteritems()])
                 print "{} {}({}) -> {}".format(cgfunc.function_type,
-                                         cgfunc.name,
-                                         arg_str,
-                                         frame.line_entry)
+                                               cgfunc.name,
+                                               arg_str,
+                                               frame.line_entry)
             print '\n'
 
     def json_dump(self):
