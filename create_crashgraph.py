@@ -6,20 +6,15 @@
 import collections
 import os
 import signal
+import pickle
 
 import lldb
+from ruamel import yaml
 from enum import Enum
-
-
-CGRegister = collections.namedtuple("CGRegister", ['name',
-                                                   'num_children',
-                                                   'value'])
-
 
 class CGFrameEntryType(Enum):
     FUNCTION = 1
     SYMBOL = 2
-
 
 class CGFrameEntry:
     def __init__(self,
@@ -180,6 +175,7 @@ class CGDebugger:
                     cgframe = CGFrame(cgfunction,
                                       frame.GetRegisters(),
                                       frame.GetLineEntry())
+                    #print cgframe.registers
                     cgcrash.add_frame(cgframe)
                 self.crashes.append(cgcrash)
                 process.Kill()
@@ -202,10 +198,12 @@ class CGDebugger:
             print '\n'
 
     def json_dump(self):
+        for crash in self.crashes:
+            print yaml.dump(crash.frames[0].function)
         return
 
 
 if __name__ == '__main__':
     cgdb = CGDebugger()
     cgdb.run()
-    cgdb.stdout_dump()
+    cgdb.json_dump()
