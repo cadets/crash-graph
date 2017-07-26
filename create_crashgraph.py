@@ -65,7 +65,7 @@ class CGSymbol(CGFrameEntry):
         CGFrameEntry.__init__(self, function_type, name, CGFrameEntryType.SYMBOL)
 
 
-CGFrame = collections.namedtuple("CGFrame", ['function', 'registers'])
+CGFrame = collections.namedtuple("CGFrame", ['function', 'registers', 'line_entry'])
 
 
 class CGCrash:
@@ -159,7 +159,8 @@ class CGDebugger:
                                        arg.GetName(),
                                        arg.GetValue())
                 cgframe = CGFrame(cgfunction,
-                                  frame.GetRegisters())
+                                  frame.GetRegisters(),
+                                  frame.GetLineEntry())
                 cgcrash.add_frame(cgframe)
             self.crashes.append(cgcrash)
             process.Kill()
@@ -175,9 +176,10 @@ class CGDebugger:
                                                          arg.val)
                                      for name, arg
                                      in cgfunc.args.iteritems()])
-                print "{} {}({})".format(cgfunc.function_type,
+                print "{} {}({}) -> {}".format(cgfunc.function_type,
                                          cgfunc.name,
-                                         arg_str)
+                                         arg_str,
+                                         frame.line_entry)
 
     def json_dump(self):
         return
