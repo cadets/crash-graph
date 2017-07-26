@@ -65,7 +65,7 @@ class CGSymbol(CGFrameEntry):
         CGFrameEntry.__init__(self, function_type, name, CGFrameEntryType.SYMBOL)
 
 
-CGFrame = collections.namedtuple("CGFrame", ['func', 'registers'])
+CGFrame = collections.namedtuple("CGFrame", ['function', 'registers'])
 
 
 class CGCrash:
@@ -152,7 +152,7 @@ class CGDebugger:
                                            False,
                                            False,
                                            False)
-                cgfunction = CGFunction(function_type=func.GetType().GetName(),
+                cgfunction = CGFunction(function_type=func.GetType(),
                                         name=func.GetName())
                 for arg in fargs:
                     cgfunction.add_arg(arg.GetTypeName(),
@@ -170,8 +170,8 @@ class CGDebugger:
         for crash in self.crashes:
             for frame in crash.get_backtrace():
                 cgfunc = frame.function
-                arg_str = ", ".join(["{} {} = {}".format(name,
-                                                         arg.atype,
+                arg_str = ", ".join(["{} {} = {}".format(arg.atype,
+                                                         name,
                                                          arg.val)
                                      for name, arg
                                      in cgfunc.args.iteritems()])
