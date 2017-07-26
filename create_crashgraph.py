@@ -9,12 +9,18 @@ import signal
 import pickle
 
 import lldb
-from ruamel import yaml
+import json
 from enum import Enum
+
+CGRegister = collections.namedtuple("CGRegister", ['type',
+                                                   'name',
+                                                   'value'])
+
 
 class CGFrameEntryType(Enum):
     FUNCTION = 1
     SYMBOL = 2
+
 
 class CGFrameEntry:
     def __init__(self,
@@ -63,9 +69,16 @@ class CGSymbol(CGFrameEntry):
                               CGFrameEntryType.SYMBOL)
 
 
-CGFrame = collections.namedtuple("CGFrame", ['function',
-                                             'registers',
-                                             'line_entry'])
+class CGFrame:
+    def __init__(self, function="", registers=None, line_entry=""):
+        if registers is None:
+            self.registers = []
+
+        self.function = function
+        self.line_entry = line_entry
+
+    def AddRegister(self, reg):
+        self.registers.append(reg)
 
 
 class CGCrash:
@@ -172,10 +185,16 @@ class CGDebugger:
                         cgfunction.add_arg(arg.GetTypeName(),
                                            arg.GetName(),
                                            arg.GetValue())
+
                     cgframe = CGFrame(cgfunction,
-                                      frame.GetRegisters(),
-                                      frame.GetLineEntry())
-                    #print cgframe.registers
+                                      line_entry=frame.GetLineEntry())
+
+                    for val in frame.GetRegisters():
+                        for reg in val:
+                            cgreg = CGRegister(val.GetName(),
+                                               reg.GetName(),
+                                               reg.GetValue())
+                            cgframe.AddRegister(cgreg)
                     cgcrash.add_frame(cgframe)
                 self.crashes.append(cgcrash)
                 process.Kill()
@@ -199,7 +218,10 @@ class CGDebugger:
 
     def json_dump(self):
         for crash in self.crashes:
-            print yaml.dump(crash.frames[0].function)
+            for frame in crash.frames:
+                for reg in frame.registers:
+                    if reg.value is not None:
+                        print json.dumps(reg)
         return
 
 
