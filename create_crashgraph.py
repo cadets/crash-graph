@@ -256,20 +256,24 @@ class CGDebugger:
 
 def display_usage(name):
     print '{} [-b <binary>] [-f <comma separated filter list>] [-t <testcase directory>]'.format(os.path.basename(sys.argv[0]))
+    sys.exit(2)
 
 if __name__ == '__main__':
     tc_path = ""
     binary = ""
     filter_list = ""
     argv = sys.argv[1:]
+    mode = ""
+    dst = ""
 
     try:
-        opts, args = getopt.getopt(argv, "b:f:ht:", ["binary=",
+        opts, args = getopt.getopt(argv, "b:f:hm:o:t:", ["binary=",
                                                      "filter=",
+                                                     "mode=",
+                                                     "out=",
                                                      "testcase-path="])
     except getopt.GetoptError:
         display_usage(sys.argv[0])
-        sys.exit(2)
 
     for opt, arg in opts:
         if opt == '-h':
@@ -278,6 +282,12 @@ if __name__ == '__main__':
             binary = arg
         elif opt in ('-f', "--filter"):
             filter_list = arg.split(',')
+        elif opt in ('-m', "--mode"):
+            if arg != "stdout" and arg != "json":
+                display_usage(name)
+            mode = arg
+        elif opt in ('-o', "--out"):
+            dst = arg
         elif opt in ('-t', "--testcase-path"):
             tc_path = arg
 
@@ -286,4 +296,8 @@ if __name__ == '__main__':
 
     cgdb = CGDebugger(binary, tc_path, filter_list)
     cgdb.run()
-    cgdb.json_dump("test.json")
+
+    if mode == "stdout":
+        cgdb.stdout_dump()
+    elif mode == "json":
+        cgdb.json_dump(dst)
