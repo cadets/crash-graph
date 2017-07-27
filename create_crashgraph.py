@@ -160,7 +160,8 @@ class CGDebugger:
 
             state = process.GetState()
             if state == lldb.eStateExited:
-                print 'No crashes observed in the process'
+                print 'No crashes observed in the process given {}'.format(tc)
+                process.Destroy()
             elif state != lldb.eStateStopped:
                 print 'Unexpected process state: {}'.format(
                     self.debugger.StateAsCString(state))
@@ -211,8 +212,6 @@ class CGDebugger:
                     cgcrash.add_frame(cgframe)
                 self.crashes.append(cgcrash)
                 process.Kill()
-                continue
-            process.Continue()
 
     def stdout_dump(self):
         for crash in self.crashes:
