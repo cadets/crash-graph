@@ -13,6 +13,7 @@ import lldb
 import json
 from enum import Enum
 
+
 def jcrash(o):
     if isinstance(o, CGCrash):
         return [o.name, o.frames]
@@ -22,6 +23,7 @@ def jcrash(o):
         return [str(o.function_type), o.name, o.args]
     elif isinstance(o, CGRegister):
         return [str(o.type), str(o.name), str(o.value)]
+
 
 CGRegister = collections.namedtuple("CGRegister", ['type',
                                                    'name',
@@ -209,8 +211,6 @@ class CGDebugger:
 
                     cgframe = CGFrame(function=cgfunction,
                                       line_entry=frame.GetLineEntry())
-
-
                     for val in frame.GetRegisters():
                         for reg in val:
                             if reg.GetValue() is not None:
@@ -237,13 +237,20 @@ class CGDebugger:
                                                frame.line_entry)
             print '\n'
 
-    def json_dump(self):
-        for crash in self.crashes:
-            print json.dumps(crash,
+    def json_dump(self, dst):
+        if dst == sys.stdout:
+            print json.dumps(self.crashes,
                              sort_keys=True,
                              indent=2,
                              separators=(',', ': '),
                              default=jcrash)
+        else:
+            with open(dst, "w+") as f:
+                print >>f, json.dumps(self.crashes,
+                                      sort_keys=True,
+                                      indent=2,
+                                      separators=(',', ': '),
+                                      default=jcrash)
         return
 
 
@@ -279,5 +286,4 @@ if __name__ == '__main__':
 
     cgdb = CGDebugger(binary, tc_path, filter_list)
     cgdb.run()
-    #cgdb.json_dump()
-    cgdb.stdout_dump()
+    cgdb.json_dump("test.json")
