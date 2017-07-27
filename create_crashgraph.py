@@ -239,18 +239,20 @@ class CGDebugger:
 
     def json_dump(self, dst):
         if dst == sys.stdout:
-            print json.dumps(self.crashes,
-                             sort_keys=True,
-                             indent=2,
-                             separators=(',', ': '),
-                             default=jcrash)
+            json.dump(self.crashes,
+                      sys.stdout,
+                      sort_keys=True,
+                      indent=2,
+                      separators=(',', ': '),
+                      default=jcrash)
         else:
             with open(dst, "w+") as f:
-                print >>f, json.dumps(self.crashes,
-                                      sort_keys=True,
-                                      indent=2,
-                                      separators=(',', ': '),
-                                      default=jcrash)
+                json.dump(self.crashes,
+                          f,
+                          sort_keys=True,
+                          indent=2,
+                          separators=(',', ': '),
+                          default=jcrash)
         return
 
 
