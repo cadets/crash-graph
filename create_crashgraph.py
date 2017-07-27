@@ -3,11 +3,11 @@
 """
 """
 
+import argparse
 import collections
 import os
 import signal
 import sys
-import getopt
 
 import lldb
 import json
@@ -256,50 +256,21 @@ class CGDebugger:
         return
 
 
-def display_usage(name):
-    print '{} [-b <binary>] [-f <comma separated filter list>] [-t <testcase directory>]'.format(os.path.basename(sys.argv[0]))
-    sys.exit(2)
-
 if __name__ == '__main__':
-    tc_path = ""
-    binary = ""
-    filter_list = ""
-    argv = sys.argv[1:]
-    mode = ""
-    dst = ""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--binary", required=True)
+    parser.add_argument("--filter")
+    parser.add_argument("--mode", choices=['stdout', 'json'], default='stdout')
+    parser.add_argument("--out", default=sys.stdout)
+    parser.add_argument("--testcase-path", required=True)
+    args = parser.parse_args()
 
-    try:
-        opts, args = getopt.getopt(argv, "b:f:hm:o:t:", ["binary=",
-                                                     "filter=",
-                                                     "mode=",
-                                                     "out=",
-                                                     "testcase-path="])
-    except getopt.GetoptError:
-        display_usage(sys.argv[0])
-
-    for opt, arg in opts:
-        if opt == '-h':
-            display_usage(sys.argv[0])
-        elif opt in ('-b', "--binary"):
-            binary = arg
-        elif opt in ('-f', "--filter"):
-            filter_list = arg.split(',')
-        elif opt in ('-m', "--mode"):
-            if arg != "stdout" and arg != "json":
-                display_usage(name)
-            mode = arg
-        elif opt in ('-o', "--out"):
-            dst = arg
-        elif opt in ('-t', "--testcase-path"):
-            tc_path = arg
-
-    if binary == "" or tc_path == "":
-        display_usage(sys.argv[0])
-
-    cgdb = CGDebugger(binary, tc_path, filter_list)
+    cgdb = CGDebugger(args.binary,
+                      args.testcase_path,
+                      args.filter.split(','))
     cgdb.run()
 
-    if mode == "stdout":
+    if args.mode == "stdout":
         cgdb.stdout_dump()
-    elif mode == "json":
-        cgdb.json_dump(dst)
+    elif args.mode == "json":
+        cgdb.json_dump(args.out)
