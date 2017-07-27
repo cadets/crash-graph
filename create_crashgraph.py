@@ -118,6 +118,7 @@ class CGDebugger:
     def __init__(self,
                  binary_path='./a.out',
                  inpath='out',
+                 filter_list=None,
                  sigstocatch=(signal.SIGSEGV, signal.SIGABRT)):
         # We hook into lldb here
         self.debugger = lldb.SBDebugger.Create()
@@ -126,9 +127,17 @@ class CGDebugger:
         self.inpath = inpath
         self.test_cases = []
 
+        if filter_list is None:
+            filter_list = [""]
+        self.filter_list = filter_list
+
         for root, dirs, files in os.walk(self.inpath):
             for fname in files:
-                self.test_cases.append(os.path.join(root, fname))
+                full_path = os.path.join(root, fname)
+                for filt in filter_list:
+                    if filt not in full_path:
+                        continue
+                    self.test_cases.append(full_path)
 
         # Create the debugging target and identify which signals we want to
         # catch
@@ -238,29 +247,37 @@ class CGDebugger:
         return
 
 
+def display_usage(name):
+    print '{} [-b <binary>] [-f <comma separated filter list>] [-t <testcase directory>]'.format(os.path.basename(sys.argv[0]))
+
 if __name__ == '__main__':
     tc_path = ""
     binary = ""
+    filter_list = ""
     argv = sys.argv[1:]
 
     try:
-        opts, args = getopt.getopt(argv, "b:ht:", ["binary=", "testcase-path="])
+        opts, args = getopt.getopt(argv, "b:f:ht:", ["binary=",
+                                                     "filter=",
+                                                     "testcase-path="])
     except getopt.GetoptError:
-        print '{} [-b <binary>] [-t <testcase directory>]'.format(os.path.basename(sys.argv[0]))
+        display_usage(sys.argv[0])
         sys.exit(2)
 
     for opt, arg in opts:
         if opt == '-h':
-            print '{} [-b <binary>] [-t <testcase directory>]'.format(os.path.basename(sys.argv[0]))
+            display_usage(sys.argv[0])
         elif opt in ('-b', "--binary"):
             binary = arg
+        elif opt in ('-f', "--filter"):
+            filter_list = arg.split(',')
         elif opt in ('-t', "--testcase-path"):
             tc_path = arg
 
     if binary == "" or tc_path == "":
-        print '{} [-b <binary>] [-t <testcase directory>]'.format(os.path.basename(sys.argv[0]))
+        display_usage(sys.argv[0])
 
-    cgdb = CGDebugger(binary, tc_path)
+    cgdb = CGDebugger(binary, tc_path, filter_list)
     cgdb.run()
     #cgdb.json_dump()
     cgdb.stdout_dump()
