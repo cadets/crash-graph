@@ -6,7 +6,8 @@
 import collections
 import os
 import signal
-import pickle
+import sys
+import getopt
 
 import lldb
 import json
@@ -239,6 +240,28 @@ class CGDebugger:
 
 
 if __name__ == '__main__':
-    cgdb = CGDebugger()
+    tc_path = ""
+    binary = ""
+    argv = sys.argv[1:]
+
+    try:
+        opts, args = getopt.getopt(argv, "b:ht:", ["binary=", "testcase-path="])
+    except getopt.GetoptError:
+        print '{} [-b <binary>] [-t <testcase directory>]'.format(os.path.basename(sys.argv[0]))
+        sys.exit(2)
+
+    for opt, arg in opts:
+        if opt == '-h':
+            print '{} [-b <binary>] [-t <testcase directory>]'.format(os.path.basename(sys.argv[0]))
+        elif opt in ('-b', "--binary"):
+            binary = arg
+        elif opt in ('-t', "--testcase-path"):
+            tc_path = arg
+
+    if binary == "" or tc_path == "":
+        print '{} [-b <binary>] [-t <testcase directory>]'.format(os.path.basename(sys.argv[0]))
+
+    cgdb = CGDebugger(binary, tc_path)
     cgdb.run()
-    cgdb.json_dump()
+    #cgdb.json_dump()
+    cgdb.stdout_dump()
