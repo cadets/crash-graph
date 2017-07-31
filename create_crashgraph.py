@@ -21,7 +21,9 @@ class CGRegister:
         self.value = val
 
     def as_json(self):
-        return [str(self.type), str(self.name), str(self.value)]
+        return {'type': str(self.type),
+                'name': str(self.name),
+                'value': str(self.value)}
 
     @classmethod
     def from_frame(cls, frame):
@@ -80,7 +82,9 @@ class CGFunction(CGFrameEntry):
             self.args[name] = self.CGArg(arg_type, val)
 
     def as_json(self):
-        return [str(self.function_type), self.name, self.args]
+        return {'function_type': str(self.function_type),
+                'name': self.name,
+                'args': self.args}
 
     @classmethod
     def from_frame(cls, frame):
@@ -122,7 +126,9 @@ class CGFrame:
         self.registers.append(reg)
 
     def as_json(self):
-        return [self.function, self.registers, str(self.line_entry)]
+        return {'function': self.function,
+                'registers': self.registers,
+                'line_entry': str(self.line_entry)}
 
     @classmethod
     def from_frame(cls, frame):
@@ -160,7 +166,8 @@ class CGCrash:
         return self.frames
 
     def as_json(self):
-        return [self.name, self.frames]
+        return {'name': self.name,
+                'frames': self.frames}
 
     @classmethod
     def from_thread(cls, thread):
