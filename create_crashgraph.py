@@ -282,7 +282,7 @@ class CGDebugger:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", required=True)
-    parser.add_argument("--filter")
+    parser.add_argument("--filter", default='')
     parser.add_argument("--mode", choices=['stdout', 'json'], default='stdout')
     parser.add_argument("--out", default=sys.stdout)
     parser.add_argument("--testcase-path", required=True)
@@ -290,7 +290,7 @@ if __name__ == '__main__':
 
     cgdb = CGDebugger(args.binary,
                       args.testcase_path,
-                      args.filter.split(','))
+                      [f for f in args.filter.split(',') if f])
     cgdb.run()
 
     if args.mode == "stdout":
