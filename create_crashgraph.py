@@ -25,9 +25,20 @@ def jcrash(o):
         return [str(o.type), str(o.name), str(o.value)]
 
 
-CGRegister = collections.namedtuple("CGRegister", ['type',
-                                                   'name',
-                                                   'value'])
+class CGRegister:
+    def __init__(self, rtype, name, val):
+        self.type = rtype
+        self.name = name
+        self.value = val
+
+    @classmethod
+    def from_frame(cls, frame):
+        return [CGRegister(val.GetName(),
+                           reg.GetName(),
+                           reg.GetValue())
+                for val in frame.GetRegisters()
+                for reg in val
+                if reg.GetValue() is not None]
 
 
 class CGFrameEntryType(Enum):
@@ -121,13 +132,7 @@ class CGFrame:
             return None
         cgframe = cls(function=cgfunction,
                       line_entry=frame.GetLineEntry())
-        for val in frame.GetRegisters():
-            for reg in val:
-                if reg.GetValue() is not None:
-                    cgreg = CGRegister(val.GetName(),
-                                       reg.GetName(),
-                                       reg.GetValue())
-                    cgframe.AddRegister(cgreg)
+        cgframe.AddRegister(CGRegister.from_frame(frame))
         return cgframe
 
 
