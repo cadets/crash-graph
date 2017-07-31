@@ -42,6 +42,7 @@ class CGRegister:
 
 
 class CGFrameEntryType(Enum):
+    UNDEFINED = 0
     FUNCTION = 1
     SYMBOL = 2
 
@@ -50,7 +51,7 @@ class CGFrameEntry:
     def __init__(self,
                  function_type="",
                  name="",
-                 frame_entry_type=):
+                 frame_entry_type=CGFrameEntryType.UNDEFINED):
         self.name = name
         self.frame_entry_type = frame_entry_type
         self.function_type = function_type
