@@ -39,7 +39,7 @@ class CGFrameEntry:
     def __init__(self,
                  function_type="",
                  name="",
-                 frame_entry_type=CGFrameEntryType.FUNCTION):
+                 frame_entry_type=):
         self.name = name
         self.frame_entry_type = frame_entry_type
         self.function_type = function_type
@@ -56,7 +56,10 @@ class CGFunction(CGFrameEntry):
     their values with their name in the scope of one frame.
     """
     def __init__(self, function_type="", name="", args=None):
-        CGFrameEntry.__init__(self, function_type, name)
+        CGFrameEntry.__init__(self,
+                              function_type,
+                              name,
+                              CGFrameEntryType.FUNCTION)
         if args is None:
             args = {}
         self.args = args
@@ -94,7 +97,9 @@ class CGSymbol(CGFrameEntry):
     method later on.
     """
     def __init__(self, function_type="", name=""):
-        CGFrameEntry.__init__(self, function_type, name,
+        CGFrameEntry.__init__(self,
+                              function_type,
+                              name,
                               CGFrameEntryType.SYMBOL)
 
 
