@@ -14,22 +14,14 @@ import json
 from enum import Enum
 
 
-def jcrash(o):
-    if isinstance(o, CGCrash):
-        return [o.name, o.frames]
-    elif isinstance(o, CGFrame):
-        return [o.function, o.registers, str(o.line_entry)]
-    elif isinstance(o, CGFunction):
-        return [str(o.function_type), o.name, o.args]
-    elif isinstance(o, CGRegister):
-        return [str(o.type), str(o.name), str(o.value)]
-
-
 class CGRegister:
     def __init__(self, rtype, name, val):
         self.type = rtype
         self.name = name
         self.value = val
+
+    def as_json(self):
+        return [str(self.type), str(self.name), str(self.value)]
 
     @classmethod
     def from_frame(cls, frame):
@@ -87,6 +79,9 @@ class CGFunction(CGFrameEntry):
         if self.args[name]:
             self.args[name] = self.CGArg(arg_type, val)
 
+    def as_json(self):
+        return [str(self.function_type), self.name, self.args]
+
     @classmethod
     def from_frame(cls, frame):
         func = frame.GetFunction()
@@ -126,6 +121,9 @@ class CGFrame:
     def AddRegister(self, reg):
         self.registers.append(reg)
 
+    def as_json(self):
+        return [self.function, self.registers, str(self.line_entry)]
+
     @classmethod
     def from_frame(cls, frame):
         cgfunction = CGFunction.from_frame(frame)
@@ -160,6 +158,9 @@ class CGCrash:
 
     def get_backtrace(self):
         return self.frames
+
+    def as_json(self):
+        return [self.name, self.frames]
 
     @classmethod
     def from_thread(cls, thread):
@@ -262,6 +263,10 @@ class CGDebugger:
             print '\n'
 
     def json_dump(self, dst):
+        def jcrash(o):
+            if hasattr(o, 'as_json'):
+                return o.as_json()
+
         if dst == sys.stdout:
             json.dump(self.crashes,
                       sys.stdout,
