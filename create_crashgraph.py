@@ -61,8 +61,9 @@ class CGFunction(CGFrameEntry):
             args = {}
         self.args = args
 
-    def add_arg(self, arg_type, name, val):
-        self.args[name] = self.CGArg(arg_type, val)
+    def add_arg(self, arg):
+        self.args[arg.GetName()] = self.CGArg(arg.GetTypeName(),
+                                              arg.GetValue())
 
     def get_arg(self, name):
         return self.args[name]
@@ -70,6 +71,21 @@ class CGFunction(CGFrameEntry):
     def set_arg(self, arg_type, name, val):
         if self.args[name]:
             self.args[name] = self.CGArg(arg_type, val)
+
+    @classmethod
+    def from_frame(cls, frame):
+        func = frame.GetFunction()
+        if not func:
+            return None
+        fargs = frame.GetVariables(True,
+                                   False,
+                                   False,
+                                   False)
+        cgfunction = cls(function_type=func.GetType(),
+                         name=func.GetName())
+        for arg in fargs:
+            cgfunction.add_arg(arg)
+        return cgfunction
 
 
 class CGSymbol(CGFrameEntry):
@@ -93,6 +109,22 @@ class CGFrame:
     def AddRegister(self, reg):
         self.registers.append(reg)
 
+    @classmethod
+    def from_frame(cls, frame):
+        cgfunction = CGFunction.from_frame(frame)
+        if not cgfunction:
+            return None
+        cgframe = cls(function=cgfunction,
+                      line_entry=frame.GetLineEntry())
+        for val in frame.GetRegisters():
+            for reg in val:
+                if reg.GetValue() is not None:
+                    cgreg = CGRegister(val.GetName(),
+                                       reg.GetName(),
+                                       reg.GetValue())
+                    cgframe.AddRegister(cgreg)
+        return cgframe
+
 
 class CGCrash:
     """
@@ -109,11 +141,23 @@ class CGCrash:
         self.thread = thread
         self.name = name
 
-    def add_frame(self, cgframe):
+    def add_frame(self, frame):
+        cgframe = CGFrame.from_frame(frame)
+        if not cgframe:
+            return
         self.frames.append(cgframe)
 
     def get_backtrace(self):
         return self.frames
+
+    @classmethod
+    def from_thread(cls, thread):
+        crash = cls(thread=thread)
+        for frame in thread:
+            if not frame:
+                continue
+            crash.add_frame(frame)
+        return crash
 
 
 class CGDebugger:
@@ -167,8 +211,6 @@ class CGDebugger:
                                          error)
             if not process:
                 return
-            cgcrash = CGCrash()
-
             state = process.GetState()
             if state == lldb.eStateExited:
                 print 'No crashes observed in the process given {}'.format(tc)
@@ -181,8 +223,6 @@ class CGDebugger:
                 thread = process.GetThreadAtIndex(0)
                 if not thread:
                     return
-                cgcrash.thread = thread
-
                 # We only want to examine if we got a signal, not any
                 # other condition.
                 stop_reason = thread.GetStopReason()
@@ -192,34 +232,7 @@ class CGDebugger:
                 if sig not in self.sigstocatch:
                     process.Continue()
 
-                for frame in thread:
-                    if not frame:
-                        continue
-                    func = frame.GetFunction()
-                    if not func:
-                        continue
-                    fargs = frame.GetVariables(True,
-                                               False,
-                                               False,
-                                               False)
-                    cgfunction = CGFunction(function_type=func.GetType(),
-                                            name=func.GetName())
-                    for arg in fargs:
-                        cgfunction.add_arg(arg.GetTypeName(),
-                                           arg.GetName(),
-                                           arg.GetValue())
-
-                    cgframe = CGFrame(function=cgfunction,
-                                      line_entry=frame.GetLineEntry())
-                    for val in frame.GetRegisters():
-                        for reg in val:
-                            if reg.GetValue() is not None:
-                                cgreg = CGRegister(val.GetName(),
-                                                   reg.GetName(),
-                                                   reg.GetValue())
-                                cgframe.AddRegister(cgreg)
-                    cgcrash.add_frame(cgframe)
-                self.crashes.append(cgcrash)
+                self.crashes.append(CGCrash.from_thread(thread))
                 process.Kill()
 
     def stdout_dump(self):
