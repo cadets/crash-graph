@@ -193,7 +193,8 @@ class CGDebugger:
                 full_path = os.path.join(root, fname)
                 for filt in filter_list:
                     if filt not in full_path:
-                        continue
+                        break
+                else:
                     self.test_cases.append(full_path)
 
         # Create the debugging target and identify which signals we want to
