@@ -266,23 +266,12 @@ class CGDebugger:
         def jcrash(o):
             if hasattr(o, 'as_json'):
                 return o.as_json()
-
-        if dst == sys.stdout:
-            json.dump(self.crashes,
-                      sys.stdout,
-                      sort_keys=True,
-                      indent=2,
-                      separators=(',', ': '),
-                      default=jcrash)
-        else:
-            with open(dst, "w+") as f:
-                json.dump(self.crashes,
-                          f,
-                          sort_keys=True,
-                          indent=2,
-                          separators=(',', ': '),
-                          default=jcrash)
-        return
+        json.dump(self.crashes,
+                  dst,
+                  sort_keys=True,
+                  indent=2,
+                  separators=(',', ': '),
+                  default=jcrash)
 
 
 if __name__ == '__main__':
@@ -290,7 +279,7 @@ if __name__ == '__main__':
     parser.add_argument("--binary", required=True)
     parser.add_argument("--filter", default='')
     parser.add_argument("--mode", choices=['stdout', 'json'], default='stdout')
-    parser.add_argument("--out", default=sys.stdout)
+    parser.add_argument("--out", type=argparse.FileType('w+'), default=sys.stdout)
     parser.add_argument("--testcase-path", required=True)
     args = parser.parse_args()
 
@@ -303,3 +292,4 @@ if __name__ == '__main__':
         cgdb.stdout_dump()
     elif args.mode == "json":
         cgdb.json_dump(args.out)
+    args.out.close()
