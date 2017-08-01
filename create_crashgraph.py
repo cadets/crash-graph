@@ -182,14 +182,13 @@ class CGDebugger:
         self.debugger = lldb.SBDebugger.Create()
         self.debugger.SetAsync(False)
 
-        self.inpath = inpath
         self.test_cases = []
 
         if filter_list is None:
             filter_list = [""]
         self.filter_list = filter_list
 
-        for root, dirs, files in os.walk(self.inpath):
+        for root, dirs, files in os.walk(inpath):
             for fname in files:
                 full_path = os.path.join(root, fname)
                 for filt in filter_list:
