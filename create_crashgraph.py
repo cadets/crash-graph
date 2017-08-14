@@ -8,11 +8,15 @@ import collections
 import os
 import signal
 import sys
+import logging
 
 import lldb
 import json
 from enum import Enum
 
+# TODO: This should be made a command line argument (--verbose)
+VERBOSE = True
+log = None
 
 class CGRegister:
     def __init__(self, rtype, name, val):
@@ -201,6 +205,8 @@ class CGDebugger:
                 for filt in filter_list:
                     if filt not in full_path:
                         break
+                    if "README" in full_path:
+                        break
                 else:
                     self.test_cases.append(full_path)
 
@@ -218,6 +224,7 @@ class CGDebugger:
         # Iterate over the test cases
         for tc in self.test_cases:
             error = lldb.SBError()
+            log.info("Testcase: {}".format(tc))
             process = self.target.Launch(self.debugger.GetListener(),
                                          None,
                                          None,
@@ -229,8 +236,10 @@ class CGDebugger:
                                          False,
                                          error)
             if not process:
+                log.info("Failed getting process")
                 return
             state = process.GetState()
+            log.info("State: {}".format(state))
             if state == lldb.eStateExited:
                 print 'No crashes observed in the process given {}'.format(tc)
                 process.Destroy()
@@ -241,17 +250,21 @@ class CGDebugger:
             else:
                 thread = process.GetThreadAtIndex(0)
                 if not thread:
+                    log.info("Failed getting thread")
                     return
                 # We only want to examine if we got a signal, not any
                 # other condition.
                 stop_reason = thread.GetStopReason()
+                log.info("Stop reason: {}".format(stop_reason))
                 if stop_reason != lldb.eStopReasonSignal:
                     process.Continue()
                 sig = thread.GetStopReasonDataAtIndex(1)
                 if sig not in self.sigstocatch:
                     process.Continue()
 
+                log.info("Appending a new crash...")
                 self.crashes.append(CGCrash.from_thread(thread))
+                log.info("Number of crashes: {}".format(len(self.crashes)))
                 process.Kill()
 
     def stdout_dump(self):
@@ -282,6 +295,9 @@ class CGDebugger:
 
 
 if __name__ == '__main__':
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+    log = logging.getLogger("CrashGraph")
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", required=True)
     parser.add_argument("--filter", default='')
@@ -290,6 +306,7 @@ if __name__ == '__main__':
     parser.add_argument("--testcase-path", required=True)
     args = parser.parse_args()
 
+    log.info("Initializing the debugger")
     cgdb = CGDebugger(args.binary,
                       args.testcase_path,
                       [f for f in args.filter.split(',') if f])
