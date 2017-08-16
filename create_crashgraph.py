@@ -228,11 +228,13 @@ class CGDebugger:
         # Iterate over the test cases
         for tc in self.test_cases:
             crash = None
-            proc = multiprocessing.Process(target=self.run_tc, args=(tc,crash,))
+            proc = multiprocessing.Process(target=self.run_tc, args=(tc,crash))
             proc.start()
 
             proc.join(TIMEOUT)
+            proc.terminate()
             proc.join()
+            print crash
             if crash is not None:
                 self.crashes.append(crash)
             print self.crashes
