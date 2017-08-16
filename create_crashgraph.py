@@ -177,12 +177,13 @@ class CGCrash:
     We also record the registers for each frame inside of this class with the
     purpose of more detailed analysis later on.
     """
-    def __init__(self, frames=None, thread=None, name="GenericCrashName"):
+    def __init__(self, frames=None, thread=None, name="GenericCrashName", tc=""):
         if frames is None:
             frames = []
         self.frames = frames
         self.thread = thread
         self.name = name
+        self.tc = tc
 
     def add_frame(self, frame):
         cgframe = CGFrame.from_frame(frame)
@@ -198,11 +199,11 @@ class CGCrash:
                 'frames': self.frames}
 
     @classmethod
-    def from_thread(cls, thread):
+    def from_thread(cls, thread, tc):
         cgthread = CGThread.from_thread(thread)
         if not cgthread:
             return None
-        crash = cls(thread=cgthread)
+        crash = cls(thread=cgthread, tc=tc)
         for frame in thread:
             if not frame:
                 continue
@@ -310,13 +311,14 @@ class CGDebugger:
                 process.Continue()
 
             log.info("Creating a new crash")
-            crash = CGCrash.from_thread(thread)
+            crash = CGCrash.from_thread(thread, tc)
             self.mpqueue.put(crash, False)
             log.info("Crash: {}".format(crash))
             process.Destroy()
 
     def stdout_dump(self):
         for crash in self.crashes:
+            print "Crash caused by: {}".format(crash.tc)
             for frame in crash.get_backtrace():
                 cgfunc = frame.function
                 arg_str = ", ".join(["{} {} = {}".format(arg.atype,
