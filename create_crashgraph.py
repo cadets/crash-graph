@@ -9,6 +9,8 @@ import os
 import signal
 import sys
 import logging
+import time
+import multiprocessing
 
 import lldb
 import json
@@ -16,7 +18,9 @@ from enum import Enum
 
 # TODO: This should be made a command line argument (--verbose)
 VERBOSE = True
+TIMEOUT = 5
 log = None
+
 
 class CGRegister:
     def __init__(self, rtype, name, val):
@@ -223,49 +227,59 @@ class CGDebugger:
 
         # Iterate over the test cases
         for tc in self.test_cases:
-            error = lldb.SBError()
-            log.info("Testcase: {}".format(tc))
-            process = self.target.Launch(self.debugger.GetListener(),
-                                         None,
-                                         None,
-                                         tc,
-                                         None,
-                                         None,
-                                         os.getcwd(),
-                                         0,
-                                         False,
-                                         error)
-            if not process:
-                log.info("Failed getting process")
-                return
-            state = process.GetState()
-            log.info("State: {}".format(state))
-            if state == lldb.eStateExited:
-                print 'No crashes observed in the process given {}'.format(tc)
-                process.Destroy()
-            elif state != lldb.eStateStopped:
-                print 'Unexpected process state: {}'.format(
-                    self.debugger.StateAsCString(state))
-                process.Kill()
-            else:
-                thread = process.GetThreadAtIndex(0)
-                if not thread:
-                    log.info("Failed getting thread")
-                    return
-                # We only want to examine if we got a signal, not any
-                # other condition.
-                stop_reason = thread.GetStopReason()
-                log.info("Stop reason: {}".format(stop_reason))
-                if stop_reason != lldb.eStopReasonSignal:
-                    process.Continue()
-                sig = thread.GetStopReasonDataAtIndex(1)
-                if sig not in self.sigstocatch:
-                    process.Continue()
+            proc = multiprocessing.Process(target=self.run_tc, args=(tc,))
+            proc.start()
 
-                log.info("Appending a new crash...")
-                self.crashes.append(CGCrash.from_thread(thread))
-                log.info("Number of crashes: {}".format(len(self.crashes)))
-                process.Kill()
+            proc.join(TIMEOUT)
+            proc.terminate()
+            proc.join()
+
+    def run_tc(self, tc=None):
+        if tc is None:
+            return
+        error = lldb.SBError()
+        log.info("Testcase: {}".format(tc))
+        process = self.target.Launch(self.debugger.GetListener(),
+                                     None,
+                                     None,
+                                     tc,
+                                     None,
+                                     None,
+                                     os.getcwd(),
+                                     0,
+                                     False,
+                                     error)
+        if not process:
+            log.info("Failed getting process")
+            return
+        state = process.GetState()
+        log.info("State: {}".format(state))
+        if state == lldb.eStateExited:
+            print 'No crashes observed in the process given {}'.format(tc)
+            process.Destroy()
+        elif state != lldb.eStateStopped:
+            print 'Unexpected process state: {}'.format(
+                self.debugger.StateAsCString(state))
+            process.Kill()
+        else:
+            thread = process.GetThreadAtIndex(0)
+            if not thread:
+                log.info("Failed getting thread")
+                return
+            # We only want to examine if we got a signal, not any
+            # other condition.
+            stop_reason = thread.GetStopReason()
+            log.info("Stop reason: {}".format(stop_reason))
+            if stop_reason != lldb.eStopReasonSignal:
+                process.Continue()
+            sig = thread.GetStopReasonDataAtIndex(1)
+            if sig not in self.sigstocatch:
+                process.Continue()
+
+            log.info("Appending a new crash...")
+            self.crashes.append(CGCrash.from_thread(thread))
+            log.info("Number of crashes: {}".format(len(self.crashes)))
+            process.Kill()
 
     def stdout_dump(self):
         for crash in self.crashes:
@@ -302,7 +316,8 @@ if __name__ == '__main__':
     parser.add_argument("--binary", required=True)
     parser.add_argument("--filter", default='')
     parser.add_argument("--mode", choices=['stdout', 'json'], default='stdout')
-    parser.add_argument("--out", type=argparse.FileType('w+'), default=sys.stdout)
+    parser.add_argument("--out", type=argparse.FileType('w+'),
+                        default=sys.stdout)
     parser.add_argument("--testcase-path", required=True)
     args = parser.parse_args()
 
@@ -310,6 +325,7 @@ if __name__ == '__main__':
     cgdb = CGDebugger(args.binary,
                       args.testcase_path,
                       [f for f in args.filter.split(',') if f])
+
     cgdb.run()
 
     if args.mode == "stdout":
