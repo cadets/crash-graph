@@ -227,14 +227,17 @@ class CGDebugger:
 
         # Iterate over the test cases
         for tc in self.test_cases:
-            proc = multiprocessing.Process(target=self.run_tc, args=(tc,))
+            crash = None
+            proc = multiprocessing.Process(target=self.run_tc, args=(tc,crash,))
             proc.start()
 
             proc.join(TIMEOUT)
-            proc.terminate()
             proc.join()
+            if crash is not None:
+                self.crashes.append(crash)
+            print self.crashes
 
-    def run_tc(self, tc=None):
+    def run_tc(self, tc=None, crash=None):
         if tc is None:
             return
         error = lldb.SBError()
@@ -276,9 +279,9 @@ class CGDebugger:
             if sig not in self.sigstocatch:
                 process.Continue()
 
-            log.info("Appending a new crash...")
-            self.crashes.append(CGCrash.from_thread(thread))
-            log.info("Number of crashes: {}".format(len(self.crashes)))
+            log.info("Creating a new crash")
+            crash = CGCrash.from_thread(thread)
+            log.info("Crash: {}".format(crash))
             process.Kill()
 
     def stdout_dump(self):
