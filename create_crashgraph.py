@@ -196,6 +196,7 @@ class CGCrash:
 
     def as_json(self):
         return {'name': self.name,
+                'input_file': self.tc,
                 'frames': self.frames}
 
     @classmethod
@@ -237,7 +238,8 @@ class CGDebugger:
                     if "README" in full_path:
                         break
                 else:
-                    self.test_cases.append(full_path)
+                    abs_path = os.path.abspath(full_path)
+                    self.test_cases.append(abs_path)
 
         # Create the debugging target and identify which signals we want to
         # catch
