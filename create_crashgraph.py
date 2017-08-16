@@ -58,6 +58,7 @@ class CGFrameEntry:
         self.frame_entry_type = frame_entry_type
         self.function_type = function_type
 
+
 class CGArg:
     def __init__(self, atype, val):
         self.atype = atype
@@ -67,9 +68,8 @@ class CGArg:
         return {'atype': atype,
                 'val': val}
 
-class CGFunction(CGFrameEntry):
-    #CGArg = collections.namedtuple("CGArg", ['atype', 'val'])
 
+class CGFunction(CGFrameEntry):
     """
     Currently, we only use CGFunction as a type of CGFrameEntry, CGSymbol is
     unused.
@@ -88,7 +88,7 @@ class CGFunction(CGFrameEntry):
 
     def add_arg(self, arg):
         self.args[arg.GetName()] = CGArg(arg.GetTypeName(),
-                                              arg.GetValue())
+                                         arg.GetValue())
 
     def get_arg(self, name):
         return self.args[name]
@@ -221,7 +221,7 @@ class CGDebugger:
         self.debugger.SetAsync(False)
 
         self.test_cases = []
-        self.mpqueue = multiprocessing.Queue()
+        self.mpqueue = None
 
         if filter_list is None:
             filter_list = [""]
@@ -251,6 +251,11 @@ class CGDebugger:
 
         # Iterate over the test cases
         for tc in self.test_cases:
+            self.mpqueue = multiprocessing.Queue()
+            if self.mpqueue is None:
+                log.error("Failed to create the queue")
+                return
+
             proc = multiprocessing.Process(target=self.run_tc, args=(tc,))
             proc.start()
 
@@ -258,12 +263,10 @@ class CGDebugger:
             proc.terminate()
             proc.join()
 
-            if self.mpqueue.empty() == False:
+            if not self.mpqueue.empty():
                 self.crashes.append(self.mpqueue.get(False))
             else:
-                log.info("Crash is None")
-            self.mpqueue = multiprocessing.Queue()
-            print self.crashes
+                log.info("No crash observed in {}".format(tc))
 
     def run_tc(self, tc=None):
         if tc is None:
@@ -281,12 +284,11 @@ class CGDebugger:
                                      False,
                                      error)
         if not process:
-            log.info("Failed getting process")
+            log.error("Failed getting process")
             return
         state = process.GetState()
         log.info("State: {}".format(state))
         if state == lldb.eStateExited:
-            print 'No crashes observed in the process given {}'.format(tc)
             process.Destroy()
         elif state != lldb.eStateStopped:
             print 'Unexpected process state: {}'.format(
