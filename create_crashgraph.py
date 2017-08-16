@@ -35,9 +35,9 @@ class CGRegister:
 
     @classmethod
     def from_frame(cls, frame):
-        return [CGRegister(val.GetName(),
-                           reg.GetName(),
-                           reg.GetValue())
+        return [CGRegister(str(val.GetName()),
+                           str(reg.GetName()),
+                           str(reg.GetValue()))
                 for val in frame.GetRegisters()
                 for reg in val
                 if reg.GetValue() is not None]
@@ -58,9 +58,17 @@ class CGFrameEntry:
         self.frame_entry_type = frame_entry_type
         self.function_type = function_type
 
+class CGArg:
+    def __init__(self, atype, val):
+        self.atype = atype
+        self.val = val
+
+    def as_json(self):
+        return {'atype': atype,
+                'val': val}
 
 class CGFunction(CGFrameEntry):
-    CGArg = collections.namedtuple("CGArg", ['atype', 'val'])
+    #CGArg = collections.namedtuple("CGArg", ['atype', 'val'])
 
     """
     Currently, we only use CGFunction as a type of CGFrameEntry, CGSymbol is
@@ -79,7 +87,7 @@ class CGFunction(CGFrameEntry):
         self.args = args
 
     def add_arg(self, arg):
-        self.args[arg.GetName()] = self.CGArg(arg.GetTypeName(),
+        self.args[arg.GetName()] = CGArg(arg.GetTypeName(),
                                               arg.GetValue())
 
     def get_arg(self, name):
@@ -87,7 +95,7 @@ class CGFunction(CGFrameEntry):
 
     def set_arg(self, arg_type, name, val):
         if self.args[name]:
-            self.args[name] = self.CGArg(arg_type, val)
+            self.args[name] = CGArg(arg_type, val)
 
     def as_json(self):
         return {'function_type': str(self.function_type),
@@ -103,7 +111,7 @@ class CGFunction(CGFrameEntry):
                                    False,
                                    False,
                                    False)
-        cgfunction = cls(function_type=func.GetType(),
+        cgfunction = cls(function_type=str(func.GetType()),
                          name=func.GetName())
         for arg in fargs:
             cgfunction.add_arg(arg)
@@ -123,14 +131,13 @@ class CGSymbol(CGFrameEntry):
 
 
 class CGThread:
-    def __init__(self, name="", tid=0):
-        self.name = name
+    def __init__(self, tid=0):
         self.tid = tid
 
     @classmethod
     def from_thread(cls, thread):
-        cgthread = cls(tid=thread.GetThreadID(),
-                       name=thread.GetName())
+        tid_int = long(thread.GetThreadID())
+        cgthread = cls(tid=tid_int)
 
         return cgthread
 
@@ -157,7 +164,7 @@ class CGFrame:
         if not cgfunction:
             return None
         cgframe = cls(function=cgfunction,
-                      line_entry=frame.GetLineEntry())
+                      line_entry=str(frame.GetLineEntry()))
         cgframe.AddRegister(CGRegister.from_frame(frame))
         return cgframe
 
@@ -250,10 +257,12 @@ class CGDebugger:
             proc.join(TIMEOUT)
             proc.terminate()
             proc.join()
-            crash = None
-            #crash = self.mpqueue.get()
-            if crash is not None:
-                self.crashes.append(crash)
+
+            if self.mpqueue.empty() == False:
+                self.crashes.append(self.mpqueue.get(False))
+            else:
+                log.info("Crash is None")
+            self.mpqueue = multiprocessing.Queue()
             print self.crashes
 
     def run_tc(self, tc=None):
@@ -282,7 +291,7 @@ class CGDebugger:
         elif state != lldb.eStateStopped:
             print 'Unexpected process state: {}'.format(
                 self.debugger.StateAsCString(state))
-            process.Kill()
+            process.Destroy()
         else:
             thread = process.GetThreadAtIndex(0)
             if not thread:
@@ -300,12 +309,9 @@ class CGDebugger:
 
             log.info("Creating a new crash")
             crash = CGCrash.from_thread(thread)
-    #        self.mpqueue.put(crash)
+            self.mpqueue.put(crash, False)
             log.info("Crash: {}".format(crash))
-            print crash.frames
-            print crash.thread
-            print crash.name
-            process.Kill()
+            process.Destroy()
 
     def stdout_dump(self):
         for crash in self.crashes:
