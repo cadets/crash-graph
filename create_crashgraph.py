@@ -122,6 +122,19 @@ class CGSymbol(CGFrameEntry):
                               CGFrameEntryType.SYMBOL)
 
 
+class CGThread:
+    def __init__(self, name="", tid=0):
+        self.name = name
+        self.tid = tid
+
+    @classmethod
+    def from_thread(cls, thread):
+        cgthread = cls(tid=thread.GetThreadID(),
+                       name=thread.GetName())
+
+        return cgthread
+
+
 class CGFrame:
     def __init__(self, function=None, registers=None, line_entry=""):
         if registers is None:
@@ -179,7 +192,10 @@ class CGCrash:
 
     @classmethod
     def from_thread(cls, thread):
-        crash = cls(thread=thread)
+        cgthread = CGThread.from_thread(thread)
+        if not cgthread:
+            return None
+        crash = cls(thread=cgthread)
         for frame in thread:
             if not frame:
                 continue
@@ -198,6 +214,7 @@ class CGDebugger:
         self.debugger.SetAsync(False)
 
         self.test_cases = []
+        self.mpqueue = multiprocessing.Queue()
 
         if filter_list is None:
             filter_list = [""]
@@ -227,19 +244,19 @@ class CGDebugger:
 
         # Iterate over the test cases
         for tc in self.test_cases:
-            crash = None
-            proc = multiprocessing.Process(target=self.run_tc, args=(tc,crash))
+            proc = multiprocessing.Process(target=self.run_tc, args=(tc,))
             proc.start()
 
             proc.join(TIMEOUT)
             proc.terminate()
             proc.join()
-            print crash
+            crash = None
+            #crash = self.mpqueue.get()
             if crash is not None:
                 self.crashes.append(crash)
             print self.crashes
 
-    def run_tc(self, tc=None, crash=None):
+    def run_tc(self, tc=None):
         if tc is None:
             return
         error = lldb.SBError()
@@ -283,7 +300,11 @@ class CGDebugger:
 
             log.info("Creating a new crash")
             crash = CGCrash.from_thread(thread)
+    #        self.mpqueue.put(crash)
             log.info("Crash: {}".format(crash))
+            print crash.frames
+            print crash.thread
+            print crash.name
             process.Kill()
 
     def stdout_dump(self):
