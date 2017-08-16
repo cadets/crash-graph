@@ -65,8 +65,8 @@ class CGArg:
         self.val = val
 
     def as_json(self):
-        return {'atype': atype,
-                'val': val}
+        return {'atype': self.atype,
+                'val': self.val}
 
 
 class CGFunction(CGFrameEntry):
