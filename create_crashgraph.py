@@ -1,3 +1,5 @@
+#!/usr/local/bin/python
+
 # Copyright (c) 2017 Domagoj Stolfa, Thomas Bytheway
 # All rights reserved.
 # 
@@ -26,8 +28,6 @@
 # LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
-
-#!/usr/local/bin/python
 
 """
 """
